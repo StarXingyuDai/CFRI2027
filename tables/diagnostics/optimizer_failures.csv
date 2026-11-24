@@ -1,0 +1,3 @@
+portfolio,horizon,formation,method,gamma,failure_reason,fallback_type
+Renewable,26,2020-11-27,MLS,NA,Positive directional derivative for linesearch,previous_or_naive
+Benchmark,52,2018-05-11,MLS,NA,Positive directional derivative for linesearch,previous_or_naive

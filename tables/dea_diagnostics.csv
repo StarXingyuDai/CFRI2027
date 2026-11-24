@@ -1,0 +1,15 @@
+DEA_model,horizon,dmu_count_original,dmu_count_used,dmu_count_removed_missing,infeasible_count
+DEA_Sharpe_Sortino,1,26,26,0,0
+DEA_Sharpe_Sortino,2,26,26,0,0
+DEA_Sharpe_Sortino,4,26,26,0,0
+DEA_Sharpe_Sortino,7,26,26,0,0
+DEA_Sharpe_Sortino,13,26,26,0,0
+DEA_Sharpe_Sortino,26,26,26,0,0
+DEA_Sharpe_Sortino,52,26,26,0,0
+DEA_Sharpe_Only,1,26,26,0,0
+DEA_Sharpe_Only,2,26,26,0,0
+DEA_Sharpe_Only,4,26,26,0,0
+DEA_Sharpe_Only,7,26,26,0,0
+DEA_Sharpe_Only,13,26,26,0,0
+DEA_Sharpe_Only,26,26,26,0,0
+DEA_Sharpe_Only,52,26,26,0,0
