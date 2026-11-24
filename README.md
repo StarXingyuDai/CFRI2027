@@ -1,6 +1,6 @@
 # README
 
-Replication materials for **A Chinese New-Energy Equity Index in Multi-Asset Portfolios: Holding Horizons and Trading Costs**.
+Replication materials for **The Role of Chinese New-Energy Equity in Portfolio Optimization: A Multi-Horizon Analysis**.
 
 ## Step 1. Software and package requirements
 
@@ -21,7 +21,7 @@ The complete run estimates all seven horizons and thirteen method–parameter se
 ## Step 2. Input workbooks and data preparation
 
 - `data/raw/Data_4_newpaper.xlsx`, sheet `Index Levels`, supplies the daily levels. `Data_Preparation_02.py` selects the Nanhua Commodity Index, CSI 300, ChinaBond Treasury and Corporate Bond Net Price indices, and the CSI CN Mainland New Energy Index (000941), stored under the workbook header `CSI Mainland New Energy Theme Index`. The workbook has no separate ticker row. The selected series is the empirical proxy for Chinese new-energy equity exposure. A join to East Money's 000941 daily quotes matched 4,013 dates from launch through the end of the sample, with a maximum absolute discrepancy of 0.016 index points. The analysis uses the workbook values.
-- `data/raw/China_Treasury_Yield_1Y.xlsx`, sheet `Treasury Yield 1Y`, supplies the daily one-year Chinese Treasury yield in the `China 1-Year Treasury Yield (%)` column. The most recent nonzero yield strictly before formation is converted into a reference return for the actual holding period. Both portfolios use it to calculate excess returns. Only the asset indices above receive portfolio weights. The source materials do not document vendor contracts or redistribution terms. Confirm the data providers and permissions before publicly posting either workbook or its derived series.
+- `data/raw/China_Treasury_Yield_1Y.xlsx`, sheet `Treasury Yield 1Y`, supplies daily observations of the annualized one-year Chinese Treasury yield in the `China 1-Year Treasury Yield (%)` column. These values are yield levels in annual percent. The most recent nonzero observation strictly before formation is used. Both portfolios use it to calculate excess returns. The CSV label Renewable identifies the expanded portfolio. Only the asset indices above receive portfolio weights. The source materials do not document vendor contracts or redistribution terms. Confirm the data providers and permissions before publicly posting either workbook or its derived series.
 - The input copies use English file, worksheet and column names. Dates, numeric observations and missing entries match the supplied workbooks.
 - `Data_Preparation_02.py` selects the last common valid date of each Friday-ending week from the index launch date. Its stand-alone entry point writes only `data/weekly_inputs.csv`. The full run reconstructs this data from the workbooks. The [China Securities Index factsheet](https://oss-ch.csindex.com.cn/static/html/csindex/public/uploads/indices/detail/files/zh_CN/000941factsheet.pdf) identifies 000941 and gives the launch date of 28 October 2009. [East Money historical quotes](https://quote.eastmoney.com/zs000941.html) were used solely for the identification check.
 
@@ -49,10 +49,15 @@ Raw workbook SHA-256 digests:
 
 ### Calendar and units
 
+- For an index level P, the simple holding-period return in percent is 100 × [P(t+h)/P(t) − 1]. Estimation, realized gross portfolio returns and portfolio statistics use these simple returns. Calculations in wealth units divide returns by 100. With decimal gross return r, per-side fee c and fractional turnover TO, the decimal net return is (1+r)(1−c×TO)−1.
+- Equation (1) converts the one-year yield level y, observed in annual percent, into the simple reference return in percent for D actual calendar days: 100 × [(1+y/100)^(D/365)−1]. This uses the quoted annual yield as the annual compounding rate. A percentage change in the quoted yield does not measure the reference return. The code evaluates the power using log1p and expm1 to preserve precision. Gross excess return equals gross portfolio return less this common reference return.
 - `data/formation_calendar.csv` records each holding's start, end, phase, training endpoints and calendar duration. Phase zero starts at the first available formation of the horizon.
-- `data/portfolio_returns.csv` contains paired realized returns per horizon, method, risk-aversion setting and portfolio. Return columns ending in `_pct` are in percentage points. Fee-drag columns ending in `_20` or `_50` are also in percentage points. Turnover is a fraction of the portfolio's initial value summing buys and sells. Its first value in each path is blank. The first holding has equal gross and net returns.
+- `data/portfolio_returns.csv` contains paired realized returns per horizon, method, risk-aversion setting and portfolio. Return columns ending in `_pct` are simple holding-period returns in percent, without annualization. Fee-drag columns ending in `_20` or `_50` are also in percentage points. Turnover is a fraction of the portfolio's initial value summing buys and sells. Its first value in each path is blank. The first holding has equal gross and net returns.
 - `data/portfolio_weights.csv` reports target weights as fractions. The benchmark's weight in the proxy index is blank because that asset is outside its universe. `NA` in `gamma` indicates a rule without a risk-aversion parameter. When reading with pandas, use `keep_default_na=False` for this string where appropriate.
 - The program verifies identical benchmark and expanded dates and reference returns, long-only unit-sum allocations, path boundaries, the net return identity and the fixed-risk gain identity. It saves realized VAR and optimizer diagnostics in `tables/diagnostics/` and records frontier exclusions and solver status in `tables/dea_diagnostics.csv`.
+
+- Sections 5.1 and 5.2 use `tables/risk_adjusted_components.csv` to compare mean excess return, excess-return volatility, downside deviation, the fraction of negative excess returns, and the root mean square conditional on a negative excess return. Downside deviation equals the latter multiplied by the square root of the shortfall share.
+- `tables/nonoverlapping_phase_results.csv` and `tables/nonoverlapping_phase_summary.csv` provide starting-week sensitivity checks described in Section 4.4. The latter gives path lengths, sign counts and medians at the 50 bp fee. Both are replication outputs.
 
 ## Step 4. Reproduce the tables
 
@@ -63,18 +68,19 @@ Raw workbook SHA-256 digests:
 | Table 3 | `table_03_sharpe_inference.csv` | All seven horizons and 13 settings, paired Sharpe differences and two HAC lag choices with Holm adjustment |
 | Table 4 | `table_04_economic_comparison.csv` | All seven horizons and 13 settings, gross gain, fee drag, net gain and return loss at both fees |
 | Table 5 | `table_05_dea_summary.csv` | Method means and medians pooled over all seven horizons and, where relevant, all γ values |
-| Table 6 | `table_06_nonoverlap_summary.csv` | All seven horizons and 13 settings, path lengths, sign counts and medians at the 50 bp fee |
 | Table A1 | `table_A1_asset_statistics.csv` | All seven horizons and all five assets |
+
+Holding-period Sharpe and Sortino ratios, DEA scores, skewness and excess kurtosis are unitless. Table 3 p-values are probabilities. Table 4 changes in returns and fee drag are percentage points per holding, without annualization. Table A1 return statistics are in percent per holding, without annualization. Table 2 reports counts, weeks and dates. The manuscript notes identify authors’ calculations and the inputs where applicable.
 
 Other files report absolute portfolio performance, both sets of frontier scores, all individual starting-date estimates and all asset weight summaries. The main inference CSV reports pointwise intervals, both HAC bandwidths, each set of Holm-adjusted p-values, and the one- and two-sided JK p-values. The 50 bp and 20 bp fee assumptions represent per-side costs. Risk-matched return loss and the fixed-gross-volatility decomposition use different scale factors, as explained in the manuscript.
 
-After running the main script, regenerate the full landscape LaTeX versions of Tables 3, 4, 6 and A1:
+After running the main script, regenerate the full landscape LaTeX versions of Tables 3, 4 and A1:
 
-    python -B Tables_09.py --output "../LeTeX/Tables"
+    python -B Tables_09.py --output ./latex-tables
 
-Use the optional --tables argument to read CSVs from an alternate run's tables directory.
+From the `CFRI2027` folder in this workspace, use `--output ../../LaTeX/Tables` to write directly to the manuscript project. Use `--tables` to read CSVs from an alternate run.
 
 ## Step 5. Reproduce the figures
 
-`Figures_08.py` is called automatically by the main script. The `figures/` folder contains eight image panels and their plotting matrices. Manuscript Figure 1 combines panels 1 and 2 (Sharpe and Sortino). Figure 2 uses panel 3 (turnover). Figure 3 combines panels 4 and 5 (return loss at 50 and 20 bp). Figure 4 uses panel 6 (DEA). Figure 5 combines panels 7 and 8 (mean weight in the proxy index and frequency of positive positions). The plots use γ = 5 where applicable. The Figure 3 plotting matrix contains decimal turnover differences. The plot multiplies them by 100 to show percentage points. All other matrices are in the displayed units.
+`Figures_08.py` is called automatically by the main script. The `figures/` folder contains eight image panels and their plotting matrices. Manuscript Figure 1 combines panels 1 and 2 (Sharpe and Sortino). Figure 2 uses panel 3 (turnover). Figure 3 combines panels 4 and 5 (return loss at 50 and 20 bp). Figure 4 uses panel 6 (DEA). Figure 5 combines panels 7 and 8 (mean weight in the proxy index and frequency of positive positions). The plots use γ = 5 where applicable. Panel 3 (`figure_03_data.csv`, manuscript Figure 2) stores turnover differences as fractions. Its image multiplies them by 100 to show percentage points per rebalance. The remaining matrices use the displayed units. Sharpe and Sortino are unitless and use holding-period returns without annualization. Return loss is in percentage points per holding, without annualization. DEA differences are in score units. Weight and positive-position frequency are percentages at formation. The stand-alone panels identify authors’ calculations as their source.
 

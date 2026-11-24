@@ -71,15 +71,6 @@ def cost_row(row):
     return (*design(row), fixed(row["fixed_risk_gross_gain_pct"]), *fees)
 
 
-def path_row(row):
-    minimum, maximum = row["n_min"], row["n_max"]
-    counts = minimum if minimum == maximum else f"{minimum}–{maximum}"
-    denominator = row["phases"]
-    return (*design(row), counts, f'{row["positive_sharpe_phases"]}/{denominator}',
-            fixed(row["sharpe_delta_median"]), f'{row["negative_loss_50_phases"]}/{denominator}',
-            fixed(row["return_loss_50_median_pct"]))
-
-
 def asset_row(row):
     return (ASSETS[row["asset"]], row["horizon"], row["n"],
             *(fixed(row[key], 2) for key in (
@@ -98,34 +89,28 @@ def complete_tables(csv_dir):
             (*first, "Δ Sharpe", "95% pointwise interval", "Baseline HAC p", "Baseline Holm p",
              "Longer-lag HAC p", "Longer-lag Holm p"),
             tuple(map(sharpe_row, rows_by_key(csv_dir/"table_03_sharpe_inference.csv", keys, grid))),
-            "HAC p-values are two-sided. The pointwise interval uses the baseline lag. Holm adjustment "
-            "uses all 91 comparisons separately for each lag. A dash denotes a rule without a risk-aversion parameter."
+            "Sharpe differences and interval bounds are unitless and use holding-period ratios without annualization. "
+            "HAC p-values are two-sided probabilities. The interval uses the baseline lag. Holm adjustment uses all "
+            "91 comparisons separately for each lag. A dash denotes a rule without a risk-aversion parameter. "
+            "Source. Authors’ calculations."
         ),
         ManuscriptTable(
             "4", "Gross return, fee drag and return loss across holding horizons",
             (*first, "Gross gain G", *(f"{label}, {fee} bp" for fee in FEES
                                       for label in ("C", "G−C", "Loss"))),
             tuple(map(cost_row, rows_by_key(csv_dir/"table_04_economic_comparison.csv", keys, grid))),
-            "All estimates are percentage points per holding period. G compares gross returns at a fixed "
+            "All gain, drag and loss estimates are in percentage points per holding period, without annualization. "
+            "G compares gross returns at a fixed "
             "gross-volatility scale. C is incremental fee drag at that scale. Loss denotes return loss at matched net volatility. "
-            "Negative return loss favors the expanded portfolio. Fees are per side."
-        ),
-        ManuscriptTable(
-            "6", "Sensitivity across non-overlapping starting dates",
-            (*first, "Holdings per path", "Positive Δ Sharpe", "Median Δ Sharpe",
-             "Negative return loss", "Median return loss"),
-            tuple(map(path_row, rows_by_key(csv_dir/"table_06_nonoverlap_summary.csv", keys, grid))),
-            "Counts report paths with the indicated sign over all starting-week offsets. "
-            "Return loss is measured at 50 bp per side in percentage points per holding. "
-            "The path summaries are descriptive because starting-week paths share calendar shocks."
+            "Negative return loss favors the expanded portfolio. Fees are in basis points per side. Source. Authors’ calculations."
         ),
         ManuscriptTable(
             "A1", "Simple asset returns across holding horizons",
             ("Index", "Horizon (weeks)", "N", "Mean", "SD", "Min", "Max", "Skewness", "Excess kurtosis"),
             tuple(map(asset_row, rows_by_key(csv_dir/"table_A1_asset_statistics.csv", ("horizon","asset"), assets))),
-            "Return quantities are in percentage points. The rows use the common weekly price panel. "
-            "Adjacent holding-period returns overlap beyond the one-week horizon. "
-            "The new-energy equity rows use the proxy index identified in Table 1."
+            "Mean, SD, Min and Max are in percent per holding period, without annualization. N is a count. "
+            "Skewness and excess kurtosis are unitless. Returns overlap beyond one week. "
+            "Source. Authors’ calculations from the common weekly index levels in Table 1."
         ),
     )
 

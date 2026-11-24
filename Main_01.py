@@ -70,17 +70,19 @@ def allocate(values, forecast_steps, previous, diag, context):
 
 def run_horizon(weekly, horizon, diag):
     prices = weekly[ASSETS]
+    # Simple asset returns in percent. The same returns feed estimation and realized performance.
     returns = (100 * (prices / prices.shift(horizon) - 1)).to_numpy()
     dates = weekly["date"].reset_index(drop=True)
-    yields = weekly["yield_1y_pct"].to_numpy()
+    annual_yields_pct = weekly["yield_1y_pct"].to_numpy()
     # First training endpoints are h,...,h+51. Formation is one mark later.
     formations = np.arange(horizon + WINDOW, len(weekly) - horizon)
     maturity = formations + horizon
     if len(formations) <= horizon:
         raise ValueError(f"At h={horizon}, a holding phase would lack a turnover observation.")
     days = (dates.iloc[maturity].to_numpy() - dates.iloc[formations].to_numpy()) / np.timedelta64(1, "D")
-    # Common excess-return reference. Portfolio weights apply only to asset indices.
-    rf = 100 * np.expm1(np.log1p(yields[formations] / 100) * days / 365)
+    # Equation (1): Compound the annual yield quoted at formation over actual calendar days.
+    # The result is a simple holding-period return in percent. log1p/expm1 evaluate the power stably.
+    rf = 100 * np.expm1(np.log1p(annual_yields_pct[formations] / 100) * days / 365)
     schedule = pd.DataFrame({
         "horizon": horizon, "phase": np.arange(len(formations)) % horizon,
         "formation": dates.iloc[formations].to_numpy(), "maturity": dates.iloc[maturity].to_numpy(),
@@ -138,14 +140,40 @@ def run_horizon(weekly, horizon, diag):
 
 
 # region 2. Performance, matched inference, and non-overlapping phase checks
-def performance_metrics(frame):
-    excess = frame["excess_pct"].to_numpy()
+def excess_return_moments(excess):
+    """Return the numerator and denominators of the gross risk-adjusted ratios."""
     volatility = np.std(excess, ddof=1)
     downside = np.sqrt(np.mean(np.minimum(excess, 0) ** 2))
+    return excess.mean(), volatility, downside
+
+
+def risk_adjusted_components(returns):
+    """Report the return and risk components used to interpret Sharpe and Sortino."""
+    columns = [*KEYS, "portfolio"]
+    rows = []
+    for key, frame in returns.groupby(columns, sort=False):
+        excess = frame["excess_pct"].to_numpy()
+        mean, volatility, downside = excess_return_moments(excess)
+        shortfalls = excess[excess < 0]
+        rows.append({
+            **dict(zip(columns, key)),
+            "observations": len(excess),
+            "mean_excess_pct": mean,
+            "excess_volatility_pct": volatility,
+            "downside_deviation_pct": downside,
+            "shortfall_share": len(shortfalls) / len(excess),
+            "shortfall_rms_pct": np.sqrt(np.mean(shortfalls ** 2)) if len(shortfalls) else np.nan,
+        })
+    return pd.DataFrame(rows)
+
+
+def performance_metrics(frame):
+    excess = frame["excess_pct"].to_numpy()
+    mean, volatility, downside = excess_return_moments(excess)
     out = {
         "MeanGross": frame["gross_pct"].mean(), "GrossVolatility": frame["gross_pct"].std(ddof=1),
-        "MeanExcess": excess.mean(), "Sharpe": excess.mean() / volatility if volatility > 0 else np.nan,
-        "Sortino": excess.mean() / downside if downside > 0 else np.nan,
+        "MeanExcess": mean, "Sharpe": mean / volatility if volatility > 0 else np.nan,
+        "Sortino": mean / downside if downside > 0 else np.nan,
         "Turnover": frame["turnover"].mean(), "observations": len(frame),
         "first_maturity": frame["maturity"].iloc[0], "last_maturity": frame["maturity"].iloc[-1],
     }
@@ -272,8 +300,9 @@ def run(output):
     tables = {
         "table_02_sample": pd.DataFrame(coverage), "table_03_sharpe_inference": inference,
         "table_04_economic_comparison": differences, "table_05_dea_summary": dea_summary,
-        "table_06_nonoverlap_summary": phase_summary(phases), "table_A1_asset_statistics": pd.DataFrame(descriptions),
-        "performance_by_portfolio": perf, "dea_by_portfolio": dea, "dea_alternative": dea_no_sortino,
+        "nonoverlapping_phase_summary": phase_summary(phases), "table_A1_asset_statistics": pd.DataFrame(descriptions),
+        "performance_by_portfolio": perf, "risk_adjusted_components": risk_adjusted_components(returns),
+        "dea_by_portfolio": dea, "dea_alternative": dea_no_sortino,
         "dea_matched_differences": dea_pivot, "nonoverlapping_phase_results": phases,
         "asset_weights_summary": weights_agg,
         "dea_diagnostics": pd.concat([dea_diag, dea_no_diag], ignore_index=True),

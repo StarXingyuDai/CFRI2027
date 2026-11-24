@@ -29,6 +29,7 @@ def weekly_inputs(data_dir=DATA):
         prices[asset] = pd.to_numeric(prices[asset], errors="coerce")
     if prices["date"].duplicated().any():
         raise ValueError("Duplicate dates in the price input.")
+    # The worksheet contains annual percentage yield levels.
     yields = pd.read_excel(data_dir / "raw" / YIELD_FILE, sheet_name="Treasury Yield 1Y")
     yields.columns = yields.columns.str.strip()
     yields = yields.rename(columns={"Date": "yield_date", "China 1-Year Treasury Yield (%)": "yield_1y_pct"})
@@ -41,6 +42,7 @@ def weekly_inputs(data_dir=DATA):
     # region 2. Last common trading mark per Friday-ending week
     eligible = prices[prices["date"].ge(INDEX_LAUNCH) & prices[ASSETS].gt(0).all(axis=1)]
     weekly = eligible.sort_values("date").groupby(pd.Grouper(key="date", freq="W-FRI")).tail(1)
+    # Attach the most recent available yield strictly before each weekly formation mark.
     weekly = pd.merge_asof(weekly, yields, left_on="date", right_on="yield_date", allow_exact_matches=False)
     if weekly["yield_1y_pct"].isna().any() or not weekly["date"].is_monotonic_increasing:
         raise ValueError("Weekly prices or formation yields are misaligned.")
